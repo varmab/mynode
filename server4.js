@@ -1,60 +1,35 @@
 var express=require('express');
 var app=express();
 
-var db=require('./db')
-
 var bodyParser=require("body-parser");
 app.use(bodyParser.json())
 app.use(bodyParser.urlencoded({extended:true}));
 
+var students=require('./routes/students')
+var books=require('./routes/books')
 
-app.get("/api/students",function(req,res){
-    db.Student.find({},function(err,students){
-        if(err) res.send(err);
-        res.send(students);
-    })
-})
+app.all('/api/*', function(req,res,next){
+    const auth = {login: "test", password: "test"} // change this
+   
+    const b64auth = (req.headers.authorization || '').split(' ')[1] || ''
+    const [login, password] = new Buffer(b64auth, 'base64').toString().split(':')
+   
+    // Verify login and password are set and correct
+    if (!login || !password || 
+        login !== auth.login || 
+        password !== auth.password) 
+   {
+      res.set('WWW-Authenticate', 'Basic realm="nope"') // change this
+      res.status(401).send('Request is not authorized. You must pass credentials') 
+      return
+    }
+   else {
+    next();
+   } 
+});
 
-app.post("/api/students",function(req,res){
-    var newStudent=new db.Student(req.body)
-    newStudent.save(function(err,student){
-        if(err) res.send(err);
-        res.send(student);
-    })
-})
-
-app.get("/api/students/:id",function(req,res){
-    var id=req.params.id;
-    db.Student.find({_id:id},function(err,student){
-        if(err) res.send(err);
-        res.send(student);
-    })
-})
-
-app.get("/api/students/search/:term",function(req,res){
-    var term=req.params.term;
-    var latestStudents=students.filter((currentStudent)=>{
-        return currentStudent.name.indexOf(term)!=-1
-    })
-    res.send(latestStudents);
-})
-
-app.delete("/api/students/:id",function(req,res){
-    var id=req.params.id;
-    db.Student.findOneAndDelete({_id:id},function(err,student){
-        if(err) res.send(err);
-        res.send(student);
-    })
-})
-
-app.put("/api/students/:id",function(req,res){
-    var id=req.params.id;
-    db.Student.findByIdAndUpdate(id,req.body,{new:true},function(err,student){
-        if(err) res.send(err);
-        res.send(student);
-    })
-    
-})
+app.use("/api/students",students);
+app.use("/api/books",books);
 
 app.listen(5000,()=>{
     console.log("server is started")
